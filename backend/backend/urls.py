@@ -23,6 +23,7 @@ from backend.settings import API_PREFIX
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('api.urls.auth_urls')),
+    path('', include('api.urls.test_urls')),
     path(API_PREFIX + 'schema', SpectacularAPIView.as_view(), name='schema'),
     path(API_PREFIX + 'docs', SpectacularSwaggerView.as_view(url_name='schema'), name='docs'),
 ]
