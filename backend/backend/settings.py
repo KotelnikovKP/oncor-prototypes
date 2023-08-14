@@ -114,6 +114,12 @@ ROSMINZDRAV_DIRECTORIES_NAME: str = os.environ.get('ROSMINZDRAV_DIRECTORIES_NAME
 ROSMINZDRAV_DIRECTORIES_USER: str = os.environ.get('ROSMINZDRAV_DIRECTORIES_USER', 'semd')
 ROSMINZDRAV_DIRECTORIES_PASSWORD: str = os.environ.get('ROSMINZDRAV_DIRECTORIES_PASSWORD', '')
 
+ORIENTDB_HOST: str = os.environ.get('ORIENTDB_HOST', 'localhost')
+ORIENTDB_PORT: str = os.environ.get('ORIENTDB_PORT', '2424')
+ORIENTDB_NAME: str = os.environ.get('ORIENTDB_NAME', 'test')
+ORIENTDB_USER: str = os.environ.get('ORIENTDB_USER', 'admin')
+ORIENTDB_PASSWORD: str = os.environ.get('ORIENTDB_PASSWORD', '')
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
@@ -147,6 +153,13 @@ DATABASES = {
         'HOST': ROSMINZDRAV_DIRECTORIES_HOST,
         'PORT': ROSMINZDRAV_DIRECTORIES_PORT,
     },
+    # 'orientdb': {
+    #     'NAME': ORIENTDB_NAME,
+    #     'USER': ORIENTDB_USER,
+    #     'PASSWORD': ORIENTDB_PASSWORD,
+    #     'HOST': ORIENTDB_HOST,
+    #     'PORT': ORIENTDB_PORT,
+    # },
 }
 
 # Password validation
