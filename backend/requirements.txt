@@ -7,3 +7,4 @@ django-cors-headers>=4.1.0
 django-filter>=23.2
 drf-spectacular>=0.26.3
 django-extensions>=3.2.3
+pyorient>=1.5.5

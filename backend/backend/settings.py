@@ -115,7 +115,10 @@ ROSMINZDRAV_DIRECTORIES_USER: str = os.environ.get('ROSMINZDRAV_DIRECTORIES_USER
 ROSMINZDRAV_DIRECTORIES_PASSWORD: str = os.environ.get('ROSMINZDRAV_DIRECTORIES_PASSWORD', '')
 
 ORIENTDB_HOST: str = os.environ.get('ORIENTDB_HOST', 'localhost')
-ORIENTDB_PORT: str = os.environ.get('ORIENTDB_PORT', '2424')
+try:
+    ORIENTDB_PORT: int = int(os.environ.get('ORIENTDB_PORT', 2424))
+except:
+    ORIENTDB_PORT = 2424
 ORIENTDB_NAME: str = os.environ.get('ORIENTDB_NAME', 'test')
 ORIENTDB_USER: str = os.environ.get('ORIENTDB_USER', 'admin')
 ORIENTDB_PASSWORD: str = os.environ.get('ORIENTDB_PASSWORD', '')
@@ -153,13 +156,6 @@ DATABASES = {
         'HOST': ROSMINZDRAV_DIRECTORIES_HOST,
         'PORT': ROSMINZDRAV_DIRECTORIES_PORT,
     },
-    # 'orientdb': {
-    #     'NAME': ORIENTDB_NAME,
-    #     'USER': ORIENTDB_USER,
-    #     'PASSWORD': ORIENTDB_PASSWORD,
-    #     'HOST': ORIENTDB_HOST,
-    #     'PORT': ORIENTDB_PORT,
-    # },
 }
 
 # Password validation
@@ -239,8 +235,10 @@ REST_FRAMEWORK = {
     'DEFAULT_METADATA_CLASS': 'rest_framework.metadata.SimpleMetadata',
 }
 
+PAGE_SIZE: int = int(os.environ.get('PAGE_SIZE', 10))
+
 SPECTACULAR_SETTINGS = {
-    'TITLE': 'ONCOR SEMD API',
+    'TITLE': 'ONCOR Prototypes API',
     'DESCRIPTION': '''
     ONCOR Prototypes REST API
     All API requests must be authorized using the Bearer token authorization
