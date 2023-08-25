@@ -1,7 +1,7 @@
 from django.db import models
 from django.db.models import Index
 
-from api.models.patient_models import Patient
+from api.models.orientdb_engine import Patient
 
 
 class SEMD(models.Model):
