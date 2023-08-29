@@ -1,6 +1,7 @@
 import math
 import time
 from collections import OrderedDict
+from datetime import datetime, date
 from typing import List
 
 from django.db import connections
@@ -33,7 +34,8 @@ class GetPatientListService:
                 person.middleName as middlename, 
                 person.birthDay.format('yyyy-MM-dd') as birthday,
                 person.gender.value as gender, 
-                person.snils as snils 
+                person.snils as snils,
+                tags.tags.tag as tags 
             FROM 
                 ptn 
         """
@@ -48,6 +50,7 @@ class GetPatientListService:
         page = request.query_params.get('page', None)
         q = request.query_params.get('q', None)
         snils = request.query_params.get('snils', None)
+        name = request.query_params.get('name', None)
 
         # Add filter to request
         if q:
@@ -91,6 +94,24 @@ class GetPatientListService:
                         WHERE
                            person.snils = "{snils}"
                     """
+            elif name:
+                names = name.split(' ')
+                lastname = names[0]
+                condition = f'person.lastName.toLowerCase() = "{lastname.lower()}"'
+                if len(names) > 1:
+                    firstname = names[1]
+                    condition += f' AND person.firstName.toLowerCase() = "{firstname.lower()}"'
+                if len(names) > 2:
+                    middlename = names[2]
+                    condition += f' AND person.middleName.toLowerCase() = "{middlename.lower()}"'
+                query_body += f"""
+                    WHERE
+                       {condition}
+                """
+                query_count_body += f"""
+                    WHERE
+                       {condition}
+                """
 
         # Calculate count of queryset
         orient_result = orient_db_client.query(query_count_body, -1)
@@ -124,32 +145,9 @@ class GetPatientListService:
                     ('birthday', rec.oRecordData.get('birthday', None)),
                     ('gender', rec.oRecordData.get('gender', None)),
                     ('snils', rec.oRecordData.get('snils', None)),
-                    ('base_diagnoses', [
-                        OrderedDict(
-                            [
-                                ('diagnosis_code', d_rec.oRecordData.get('mkb10', None)),
-                                ('diagnosis_name', d_rec.oRecordData.get('name', None)),
-                            ]
-                        )
-                        for d_rec in orient_db_client.query(
-                            f'''
-                            SELECT 
-                                diagnosis.registerDz.mkb10 as mkb10, 
-                                diagnosis.registerDz.name as name 
-                            from 
-                                (SELECT 
-                                    EXPAND(records) 
-                                FROM 
-                                    ptn 
-                                WHERE 
-                                    @rid={str(rec.oRecordData.get('rid', None))}) 
-                            WHERE 
-                                @class="RcDz"
-                            ''',
-                            -1
-                        )
-                    ]),
+                    ('base_diagnoses', get_patient_base_diagnoses(str(rec.oRecordData.get('rid', None)))),
                     ('semd_diagnoses', get_patient_semd_diagnoses(str(rec.oRecordData.get('rid', None)))),
+                    ('tags', get_patient_tags(rec.oRecordData.get('tags', None))),
                 ]
             )
             for rec in orient_result
@@ -214,7 +212,8 @@ class GetPatientDetailsService:
                 person.middleName as middlename, 
                 person.birthDay.format('yyyy-MM-dd') as birthday,
                 person.gender.value as gender, 
-                person.snils as snils 
+                person.snils as snils,
+                tags.tags.tag as tags 
             FROM 
                 ptn
             WHERE
@@ -236,32 +235,9 @@ class GetPatientDetailsService:
                     ('birthday', orient_result[0].oRecordData.get('birthday', None)),
                     ('gender', orient_result[0].oRecordData.get('gender', None)),
                     ('snils', orient_result[0].oRecordData.get('snils', None)),
-                    ('base_diagnoses', [
-                        OrderedDict(
-                            [
-                                ('diagnosis_code', d_rec.oRecordData.get('mkb10', None)),
-                                ('diagnosis_name', d_rec.oRecordData.get('name', None)),
-                            ]
-                        )
-                        for d_rec in orient_db_client.query(
-                            f'''
-                            SELECT 
-                                diagnosis.registerDz.mkb10 as mkb10, 
-                                diagnosis.registerDz.name as name 
-                            from 
-                                (SELECT 
-                                    EXPAND(records) 
-                                FROM 
-                                    ptn 
-                                WHERE 
-                                    @rid={str(orient_result[0].oRecordData.get('rid', None))}) 
-                            WHERE 
-                                @class="RcDz"
-                            ''',
-                            -1
-                        )
-                    ]),
-                    ('semd_diagnoses', get_patient_semd_diagnoses(str(orient_result[0].oRecordData.get('rid', None))))
+                    ('base_diagnoses', get_patient_base_diagnoses(str(orient_result[0].oRecordData.get('rid', None)))),
+                    ('semd_diagnoses', get_patient_semd_diagnoses(str(orient_result[0].oRecordData.get('rid', None)))),
+                    ('tags', get_patient_tags(orient_result[0].oRecordData.get('tags', None))),
                 ]
             )
 
@@ -284,6 +260,39 @@ class GetPatientDetailsService:
         return_serializer.is_valid()
 
         return return_serializer
+
+
+def get_patient_base_diagnoses(rid: str) -> List[OrderedDict]:
+    result = [
+        OrderedDict(
+            [
+                ('diagnosis_code', d_rec.oRecordData.get('mkb10', None)),
+                ('diagnosis_name', d_rec.oRecordData.get('name', None)),
+                ('diagnosis_date', d_rec.oRecordData.get('date', None)),
+            ]
+        )
+        for d_rec in orient_db_client.query(
+            f'''
+            SELECT 
+                diagnosis.registerDz.mkb10 as mkb10, 
+                diagnosis.registerDz.name as name,
+                timeRc.format('yyyy-MM-dd') as date 
+            from 
+                (SELECT 
+                    EXPAND(records) 
+                FROM 
+                    ptn 
+                WHERE 
+                    @rid={rid}) 
+            WHERE 
+                @class="RcDz"
+            ''',
+            -1
+        )
+    ]
+    result = sorted(result, key=lambda x: date.today() if x['diagnosis_date'] is None else x['diagnosis_date'])
+
+    return result
 
 
 def get_patient_semd_diagnoses(rid: str) -> List[OrderedDict]:
@@ -313,7 +322,16 @@ def get_patient_semd_diagnoses(rid: str) -> List[OrderedDict]:
     if messages:
         query_body = """
             SELECT
-                array_to_string(xpath('/x:ClinicalDocument/x:component/x:structuredBody/x:component/x:section[x:code[@code="DOCINFO"]]/x:entry/x:observation/x:value[@codeSystem="1.2.643.5.1.13.13.11.1005"]/@code|/x:ClinicalDocument/x:component/x:structuredBody/x:component/x:section[x:code[@code="DGN"]]/x:entry/x:act/x:entryRelationship/x:observation/x:value[@codeSystem="1.2.643.5.1.13.13.11.1005"]/@code|/x:ClinicalDocument/x:component/x:structuredBody/x:component/x:section[x:code[@code="DGN"]]/x:entry/x:observation/x:entryRelationship/x:observation/x:value[@codeSystem="1.2.643.5.1.13.13.11.1005"]/@code|/x:ClinicalDocument/x:component/x:structuredBody/x:component/x:section[x:code[@code="PLANSUR"]]/x:entry/x:observation/x:entryRelationship/x:act/x:value[@codeSystem="1.2.643.5.1.13.13.11.1005"]/@code|/x:ClinicalDocument/x:component/x:structuredBody/x:component/x:section[x:code[@code="DGN"]]/x:entry/x:observation/x:entryRelationship/x:observation/x:value[@codeSystem="1.2.643.5.1.13.13.11.1005"]/@code', payload::xml, '{{x,urn:hl7-org:v3}}'), ',') as diagnoses
+                array_to_string(xpath('/x:ClinicalDocument/x:component/x:structuredBody/x:component/x:section[x:code[@code="DOCINFO"]]/x:entry/x:observation/x:value[@codeSystem="1.2.643.5.1.13.13.11.1005"]/@code', payload::xml, '{{x,urn:hl7-org:v3}}'), ',') as diagnoses1,
+                array_to_string(xpath('/x:ClinicalDocument/x:component/x:structuredBody/x:component/x:section[x:code[@code="DOCINFO"]]/x:entry/x:observation[x:value[@codeSystem="1.2.643.5.1.13.13.11.1005"]]/x:effectiveTime/@value', payload::xml, '{{x,urn:hl7-org:v3}}'), ',') as diagnoses_time1,
+                array_to_string(xpath('/x:ClinicalDocument/x:component/x:structuredBody/x:component/x:section[x:code[@code="DGN"]]/x:entry/x:act/x:entryRelationship/x:observation/x:value[@codeSystem="1.2.643.5.1.13.13.11.1005"]/@code', payload::xml, '{{x,urn:hl7-org:v3}}'), ',') as diagnoses2,
+                array_to_string(xpath('/x:ClinicalDocument/x:component/x:structuredBody/x:component/x:section[x:code[@code="DGN"]]/x:entry/x:act/x:entryRelationship/x:observation[x:value[@codeSystem="1.2.643.5.1.13.13.11.1005"]]/x:effectiveTime/@value', payload::xml, '{{x,urn:hl7-org:v3}}'), ',') as diagnoses_time2,
+                array_to_string(xpath('/x:ClinicalDocument/x:component/x:structuredBody/x:component/x:section[x:code[@code="DGN"]]/x:entry/x:observation/x:entryRelationship/x:observation/x:value[@codeSystem="1.2.643.5.1.13.13.11.1005"]/@code', payload::xml, '{{x,urn:hl7-org:v3}}'), ',') as diagnoses3,
+                array_to_string(xpath('/x:ClinicalDocument/x:component/x:structuredBody/x:component/x:section[x:code[@code="DGN"]]/x:entry/x:observation/x:entryRelationship/x:observation[x:value[@codeSystem="1.2.643.5.1.13.13.11.1005"]]/x:effectiveTime/@value', payload::xml, '{{x,urn:hl7-org:v3}}'), ',') as diagnoses_time3,
+                array_to_string(xpath('/x:ClinicalDocument/x:component/x:structuredBody/x:component/x:section[x:code[@code="PLANSUR"]]/x:entry/x:observation/x:entryRelationship/x:act/x:value[@codeSystem="1.2.643.5.1.13.13.11.1005"]/@code', payload::xml, '{{x,urn:hl7-org:v3}}'), ',') as diagnoses4,
+                array_to_string(xpath('/x:ClinicalDocument/x:component/x:structuredBody/x:component/x:section[x:code[@code="PLANSUR"]]/x:entry/x:observation/x:entryRelationship/x:act[x:value[@codeSystem="1.2.643.5.1.13.13.11.1005"]]/x:effectiveTime/@value', payload::xml, '{{x,urn:hl7-org:v3}}'), ',') as diagnoses_time4,
+                array_to_string(xpath('/x:ClinicalDocument/x:component/x:structuredBody/x:component/x:section[x:code[@code="DGN"]]/x:entry/x:observation/x:entryRelationship/x:observation/x:value[@codeSystem="1.2.643.5.1.13.13.11.1005"]/@code', payload::xml, '{{x,urn:hl7-org:v3}}'), ',') as diagnoses5,
+                array_to_string(xpath('/x:ClinicalDocument/x:component/x:structuredBody/x:component/x:section[x:code[@code="DGN"]]/x:entry/x:observation/x:entryRelationship/x:observation[x:value[@codeSystem="1.2.643.5.1.13.13.11.1005"]]/x:effectiveTime/@value', payload::xml, '{{x,urn:hl7-org:v3}}'), ',') as diagnoses_time5
             FROM
                 vimis_sending
             WHERE
@@ -326,27 +344,78 @@ def get_patient_semd_diagnoses(rid: str) -> List[OrderedDict]:
     diagnoses = set()
     if message_diagnoses:
         for message_diagnosis in message_diagnoses:
-            for diagnosis in message_diagnosis[0].split(','):
-                if diagnosis:
-                    diagnoses = diagnoses.union({diagnosis})
+            for i in range(5):
+                row_diagnoses = message_diagnosis[i * 2].split(',')
+                row_diagnoses_time = message_diagnosis[i * 2 + 1].split(',')
+                for n, diagnosis in enumerate(row_diagnoses):
+                    if len(row_diagnoses) == len(row_diagnoses_time):
+                        if diagnosis:
+                            try:
+                                dat = datetime(
+                                    int(row_diagnoses_time[n][0:4]),
+                                    int(row_diagnoses_time[n][4:6]),
+                                    int(row_diagnoses_time[n][6:8])
+                                ).date()
+                            except:
+                                dat = None
+                            diagnoses = diagnoses.union({(diagnosis, dat)})
+                    else:
+                        if diagnosis:
+                            diagnoses = diagnoses.union({(diagnosis, None)})
 
     # Formate result diagnoses list
     result = list()
-    for code in list(diagnoses):
-        query_body = f"""
-            SELECT
-                name
-            FROM
-                directory
-            WHERE
-                passport_oid = '1.2.643.5.1.13.13.11.1005' AND
-                code = '{code}'
-            ORDER BY
-                version DESC
-            """
-        with connections['rosminzdrav-directories'].cursor() as cursor:
-            cursor.execute(query_body)
-            names = cursor.fetchall()
-        result.append(OrderedDict([('diagnosis_code', code), ('diagnosis_name', names[0][0])]))
+    diagnoses = sorted(diagnoses, key=lambda x: x[0]+'None' if x[1] is None else x[0]+x[1].strftime("%Y%m%d"))
+    previous_code = None
+    for code, dat in diagnoses:
+        if previous_code is None or previous_code != code:
+            previous_code = code
+            query_body = f"""
+                SELECT
+                    name
+                FROM
+                    directory
+                WHERE
+                    passport_oid = '1.2.643.5.1.13.13.11.1005' AND
+                    code = '{code}'
+                ORDER BY
+                    version DESC
+                """
+            with connections['rosminzdrav-directories'].cursor() as cursor:
+                cursor.execute(query_body)
+                names = cursor.fetchall()
+            result.append(OrderedDict([
+                ('diagnosis_code', code),
+                ('diagnosis_name', names[0][0]),
+                ('diagnosis_date', dat)
+            ]))
+    result = sorted(result, key=lambda x: date.today() if x['diagnosis_date'] is None else x['diagnosis_date'])
+
+    return result
+
+
+def get_patient_tags(tags: list) -> List[OrderedDict]:
+    result = [
+        OrderedDict(
+            [
+                ('tag_rid', str(tag.oRecordData.get('rid', None))),
+                ('tag_name', tag.oRecordData.get('name', None)),
+                ('tag_description', tag.oRecordData.get('description', None)),
+            ]
+        )
+        for tag in orient_db_client.query(
+            f'''
+            SELECT 
+                @rid, 
+                name,
+                description 
+            from 
+                PtnTag 
+            WHERE 
+                @rid in [{','.join([str(rid) for rid in tags])}]
+            ''',
+            -1
+        )
+    ]
 
     return result
