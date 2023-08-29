@@ -26,10 +26,13 @@ class PatientViewSet(ModelViewSet):
         responses=expand_dict({status.HTTP_200_OK: PatientListSerializer, }, simple_responses),
         parameters=[
             OpenApiParameter('q', OpenApiTypes.STR, OpenApiParameter.QUERY,
-                             description='Patient lastname or snils for result set filtering '
+                             description='Patient name or snils for result set filtering '
                                          '(by content case insensitive).'),
             OpenApiParameter('snils', OpenApiTypes.STR, OpenApiParameter.QUERY,
                              description='Patient snils for result set filtering.'),
+            OpenApiParameter('name', OpenApiTypes.STR, OpenApiParameter.QUERY,
+                             description='Patient name for result set filtering '
+                                         '(by content case insensitive).'),
             OpenApiParameter('page', OpenApiTypes.INT, OpenApiParameter.QUERY,
                              description='A page number within the paginated result set.'),
         ],

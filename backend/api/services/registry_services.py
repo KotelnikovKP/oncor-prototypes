@@ -264,6 +264,7 @@ class GetDiagnosisRegistryPatientsService:
         page = request.query_params.get('page', None)
         q = request.query_params.get('q', None)
         snils = request.query_params.get('snils', None)
+        name = request.query_params.get('name', None)
 
         # Add filter to request
         if q:
@@ -303,6 +304,22 @@ class GetDiagnosisRegistryPatientsService:
                     query_count_body += f"""
                         AND person.snils = "{snils}"
                     """
+            elif name:
+                names = name.split(' ')
+                lastname = names[0]
+                condition = f'person.lastName.toLowerCase() = "{lastname.lower()}"'
+                if len(names) > 1:
+                    firstname = names[1]
+                    condition += f' AND person.firstName.toLowerCase() = "{firstname.lower()}"'
+                if len(names) > 2:
+                    middlename = names[2]
+                    condition += f' AND person.middleName.toLowerCase() = "{middlename.lower()}"'
+                query_body += f"""
+                    AND {condition}
+                """
+                query_count_body += f"""
+                    AND {condition}
+                """
 
         # Calculate count of queryset
         orient_result = orient_db_client.query(query_count_body, -1)

@@ -98,6 +98,9 @@ class DiagnosisRegistryViewSet(ModelViewSet):
                                          '(by content case insensitive).'),
             OpenApiParameter('snils', OpenApiTypes.STR, OpenApiParameter.QUERY,
                              description='Patient snils for result set filtering.'),
+            OpenApiParameter('name', OpenApiTypes.STR, OpenApiParameter.QUERY,
+                             description='Patient name for result set filtering '
+                                         '(by content case insensitive).'),
             OpenApiParameter('page', OpenApiTypes.INT, OpenApiParameter.QUERY,
                              description='A page number within the paginated result set.'),
         ],

@@ -9,6 +9,16 @@ class PatientDiagnosisSerializer(serializers.Serializer):
     """
     diagnosis_code = serializers.CharField(help_text='Diagnosis mkb10 code')
     diagnosis_name = serializers.CharField(required=False, help_text='Diagnosis name')
+    diagnosis_date = serializers.DateField(required=False, help_text='Diagnosis date')
+
+
+class PatientTagSerializer(serializers.Serializer):
+    """
+        Standard patient diagnosis schema (for all responses)
+    """
+    tag_rid = serializers.CharField(help_text='Tag @rid')
+    tag_name = serializers.CharField(required=False, help_text='Tag name')
+    tag_description = serializers.CharField(required=False, help_text='Tag description')
 
 
 class PatientSerializer(serializers.Serializer):
@@ -24,6 +34,7 @@ class PatientSerializer(serializers.Serializer):
     snils = serializers.CharField(help_text='Patient SNILS')
     base_diagnoses = PatientDiagnosisSerializer(many=True)
     semd_diagnoses = PatientDiagnosisSerializer(many=True)
+    tags = PatientTagSerializer(many=True)
 
     # class Meta:
     #     model = Patient
