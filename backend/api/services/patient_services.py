@@ -2,16 +2,17 @@ import math
 import time
 from collections import OrderedDict
 from datetime import datetime, date
+from html import unescape
 from typing import List
 
+import xmltodict
 from django.db import connections
 from rest_framework.exceptions import ParseError, NotFound
 from rest_framework.request import Request
 from rest_framework.viewsets import ModelViewSet
 
-from api.models.egisz_db_models import VimisSending
-from api.models.oncor_data_analytics_models import RcSms
-from api.serializers.patient_serializers import PatientListSerializer, PatientDetailsSerializer, PatientSerializer
+from api.serializers.patient_serializers import PatientListSerializer, PatientDetailsSerializer, PatientSerializer, \
+    PatientListDiagnosisSerializer, PatientDiagnosisSerializer
 from api.serializers.serializers import PaginationListSerializer
 
 from api.models.orientdb_engine import orient_db_client
@@ -35,7 +36,15 @@ class GetPatientListService:
                 person.birthDay.format('yyyy-MM-dd') as birthday,
                 person.gender.value as gender, 
                 person.snils as snils,
-                tags.tags.tag as tags 
+                tags.tags.tag as tags,
+                observer.nsiMedOrg.oid as mo_oid,
+                observer.nsiMedOrg.name as mo_name,
+                person.address.medTerr.name as med_terr,
+                person.address.livingAreaType.rbps.S_NAME.value as living_area_type,
+                person.phones as phones,
+                person.address.locality.type as locality_type,
+                person.address.locality.name as locality_name,
+                person.address.address as address
             FROM 
                 ptn 
         """
@@ -145,6 +154,18 @@ class GetPatientListService:
                     ('birthday', rec.oRecordData.get('birthday', None)),
                     ('gender', rec.oRecordData.get('gender', None)),
                     ('snils', rec.oRecordData.get('snils', None)),
+                    ('mo_oid', rec.oRecordData.get('mo_oid', None)),
+                    ('mo_name', rec.oRecordData.get('mo_name', None)),
+                    ('med_terr', rec.oRecordData.get('med_terr', None)),
+                    ('living_area_type', rec.oRecordData.get('living_area_type', None)),
+                    ('phones', rec.oRecordData.get('phones', None)),
+                    ('address', OrderedDict(
+                        [
+                            ('locality_type', rec.oRecordData.get('locality_type', None)),
+                            ('locality_name', rec.oRecordData.get('locality_name', None)),
+                            ('address', rec.oRecordData.get('address', None)),
+                        ]
+                    )),
                     ('base_diagnoses', get_patient_base_diagnoses(str(rec.oRecordData.get('rid', None)))),
                     ('semd_diagnoses', get_patient_semd_diagnoses(str(rec.oRecordData.get('rid', None)))),
                     ('tags', get_patient_tags(rec.oRecordData.get('tags', None))),
@@ -213,7 +234,15 @@ class GetPatientDetailsService:
                 person.birthDay.format('yyyy-MM-dd') as birthday,
                 person.gender.value as gender, 
                 person.snils as snils,
-                tags.tags.tag as tags 
+                tags.tags.tag as tags,
+                observer.nsiMedOrg.oid as mo_oid,
+                observer.nsiMedOrg.name as mo_name,
+                person.address.medTerr.name as med_terr,
+                person.address.livingAreaType.rbps.S_NAME.value as living_area_type,
+                person.phones as phones,
+                person.address.locality.type as locality_type,
+                person.address.locality.name as locality_name,
+                person.address.address as address
             FROM 
                 ptn
             WHERE
@@ -235,6 +264,18 @@ class GetPatientDetailsService:
                     ('birthday', orient_result[0].oRecordData.get('birthday', None)),
                     ('gender', orient_result[0].oRecordData.get('gender', None)),
                     ('snils', orient_result[0].oRecordData.get('snils', None)),
+                    ('mo_oid', orient_result[0].oRecordData.get('mo_oid', None)),
+                    ('mo_name', orient_result[0].oRecordData.get('mo_name', None)),
+                    ('med_terr', orient_result[0].oRecordData.get('med_terr', None)),
+                    ('living_area_type', orient_result[0].oRecordData.get('living_area_type', None)),
+                    ('phones', orient_result[0].oRecordData.get('phones', None)),
+                    ('address', OrderedDict(
+                        [
+                            ('locality_type', orient_result[0].oRecordData.get('locality_type', None)),
+                            ('locality_name', orient_result[0].oRecordData.get('locality_name', None)),
+                            ('address', orient_result[0].oRecordData.get('address', None)),
+                        ]
+                    )),
                     ('base_diagnoses', get_patient_base_diagnoses(str(orient_result[0].oRecordData.get('rid', None)))),
                     ('semd_diagnoses', get_patient_semd_diagnoses(str(orient_result[0].oRecordData.get('rid', None)))),
                     ('tags', get_patient_tags(orient_result[0].oRecordData.get('tags', None))),
@@ -268,7 +309,9 @@ def get_patient_base_diagnoses(rid: str) -> List[OrderedDict]:
             [
                 ('diagnosis_code', d_rec.oRecordData.get('mkb10', None)),
                 ('diagnosis_name', d_rec.oRecordData.get('name', None)),
-                ('diagnosis_date', d_rec.oRecordData.get('date', None)),
+                ('diagnosis_first_date', d_rec.oRecordData.get('date', None)),
+                ('diagnosis_first_kind_code', ''),
+                ('diagnosis_first_kind_name', ''),
             ]
         )
         for d_rec in orient_db_client.query(
@@ -290,7 +333,8 @@ def get_patient_base_diagnoses(rid: str) -> List[OrderedDict]:
             -1
         )
     ]
-    result = sorted(result, key=lambda x: date.today() if x['diagnosis_date'] is None else x['diagnosis_date'])
+    result = \
+        sorted(result, key=lambda x: date.today() if x['diagnosis_first_date'] is None else x['diagnosis_first_date'])
 
     return result
 
@@ -322,16 +366,7 @@ def get_patient_semd_diagnoses(rid: str) -> List[OrderedDict]:
     if messages:
         query_body = """
             SELECT
-                array_to_string(xpath('/x:ClinicalDocument/x:component/x:structuredBody/x:component/x:section[x:code[@code="DOCINFO"]]/x:entry/x:observation/x:value[@codeSystem="1.2.643.5.1.13.13.11.1005"]/@code', payload::xml, '{{x,urn:hl7-org:v3}}'), ',') as diagnoses1,
-                array_to_string(xpath('/x:ClinicalDocument/x:component/x:structuredBody/x:component/x:section[x:code[@code="DOCINFO"]]/x:entry/x:observation[x:value[@codeSystem="1.2.643.5.1.13.13.11.1005"]]/x:effectiveTime/@value', payload::xml, '{{x,urn:hl7-org:v3}}'), ',') as diagnoses_time1,
-                array_to_string(xpath('/x:ClinicalDocument/x:component/x:structuredBody/x:component/x:section[x:code[@code="DGN"]]/x:entry/x:act/x:entryRelationship/x:observation/x:value[@codeSystem="1.2.643.5.1.13.13.11.1005"]/@code', payload::xml, '{{x,urn:hl7-org:v3}}'), ',') as diagnoses2,
-                array_to_string(xpath('/x:ClinicalDocument/x:component/x:structuredBody/x:component/x:section[x:code[@code="DGN"]]/x:entry/x:act/x:entryRelationship/x:observation[x:value[@codeSystem="1.2.643.5.1.13.13.11.1005"]]/x:effectiveTime/@value', payload::xml, '{{x,urn:hl7-org:v3}}'), ',') as diagnoses_time2,
-                array_to_string(xpath('/x:ClinicalDocument/x:component/x:structuredBody/x:component/x:section[x:code[@code="DGN"]]/x:entry/x:observation/x:entryRelationship/x:observation/x:value[@codeSystem="1.2.643.5.1.13.13.11.1005"]/@code', payload::xml, '{{x,urn:hl7-org:v3}}'), ',') as diagnoses3,
-                array_to_string(xpath('/x:ClinicalDocument/x:component/x:structuredBody/x:component/x:section[x:code[@code="DGN"]]/x:entry/x:observation/x:entryRelationship/x:observation[x:value[@codeSystem="1.2.643.5.1.13.13.11.1005"]]/x:effectiveTime/@value', payload::xml, '{{x,urn:hl7-org:v3}}'), ',') as diagnoses_time3,
-                array_to_string(xpath('/x:ClinicalDocument/x:component/x:structuredBody/x:component/x:section[x:code[@code="PLANSUR"]]/x:entry/x:observation/x:entryRelationship/x:act/x:value[@codeSystem="1.2.643.5.1.13.13.11.1005"]/@code', payload::xml, '{{x,urn:hl7-org:v3}}'), ',') as diagnoses4,
-                array_to_string(xpath('/x:ClinicalDocument/x:component/x:structuredBody/x:component/x:section[x:code[@code="PLANSUR"]]/x:entry/x:observation/x:entryRelationship/x:act[x:value[@codeSystem="1.2.643.5.1.13.13.11.1005"]]/x:effectiveTime/@value', payload::xml, '{{x,urn:hl7-org:v3}}'), ',') as diagnoses_time4,
-                array_to_string(xpath('/x:ClinicalDocument/x:component/x:structuredBody/x:component/x:section[x:code[@code="DGN"]]/x:entry/x:observation/x:entryRelationship/x:observation/x:value[@codeSystem="1.2.643.5.1.13.13.11.1005"]/@code', payload::xml, '{{x,urn:hl7-org:v3}}'), ',') as diagnoses5,
-                array_to_string(xpath('/x:ClinicalDocument/x:component/x:structuredBody/x:component/x:section[x:code[@code="DGN"]]/x:entry/x:observation/x:entryRelationship/x:observation[x:value[@codeSystem="1.2.643.5.1.13.13.11.1005"]]/x:effectiveTime/@value', payload::xml, '{{x,urn:hl7-org:v3}}'), ',') as diagnoses_time5
+                regexp_replace(array_to_string(xpath('/x:ClinicalDocument/x:component/x:structuredBody/x:component//x:observation[x:value[@codeSystem="1.2.643.5.1.13.13.11.1005"]]', payload::xml, '{{x,urn:hl7-org:v3}}'), '<new/>'), '\n', ' ', 'g') as diagnoses
             FROM
                 vimis_sending
             WHERE
@@ -344,52 +379,84 @@ def get_patient_semd_diagnoses(rid: str) -> List[OrderedDict]:
     diagnoses = set()
     if message_diagnoses:
         for message_diagnosis in message_diagnoses:
-            for i in range(5):
-                row_diagnoses = message_diagnosis[i * 2].split(',')
-                row_diagnoses_time = message_diagnosis[i * 2 + 1].split(',')
-                for n, diagnosis in enumerate(row_diagnoses):
-                    if len(row_diagnoses) == len(row_diagnoses_time):
-                        if diagnosis:
-                            try:
-                                dat = datetime(
-                                    int(row_diagnoses_time[n][0:4]),
-                                    int(row_diagnoses_time[n][4:6]),
-                                    int(row_diagnoses_time[n][6:8])
+            xmls = message_diagnosis[0].split('<new/>')
+            for xml in xmls:
+                if xml:
+                    try:
+                        row_diagnosis = None
+                        row_diagnosis_name = None
+                        row_diagnosis_time = None
+                        row_diagnosis_kind_code = None
+                        row_diagnosis_kind_name = None
+                        observation = xmltodict.parse(xml)['observation']
+                        observation_values = observation.get('value', None)
+                        if observation_values:
+                            if isinstance(observation_values, dict):
+                                observation_values = [observation_values]
+                            for observation_value in observation_values:
+                                if isinstance(observation_value, dict):
+                                    observation_value_code_system = observation_value.get('@codeSystem', '')
+                                    if observation_value_code_system == '1.2.643.5.1.13.13.11.1005':
+                                        row_diagnosis = observation_value.get('@code', None)
+                                        row_diagnosis_name = unescape(observation_value.get('@displayName', None))
+                                        break
+                        observation_effective_times = observation.get('effectiveTime', None)
+                        if isinstance(observation_effective_times, dict):
+                            observation_effective_time = observation_effective_times.get('@value', None)
+                            if isinstance(observation_effective_time, str):
+                                row_diagnosis_time = datetime(
+                                    int(observation_effective_time[0:4]),
+                                    int(observation_effective_time[4:6]),
+                                    int(observation_effective_time[6:8])
                                 ).date()
-                            except:
-                                dat = None
-                            diagnoses = diagnoses.union({(diagnosis, dat)})
-                    else:
-                        if diagnosis:
-                            diagnoses = diagnoses.union({(diagnosis, None)})
+                        observation_codes = observation.get('code', None)
+                        if observation_codes:
+                            if isinstance(observation_codes, dict):
+                                observation_codes = [observation_codes]
+                            for observation_code in observation_codes:
+                                if isinstance(observation_code, dict):
+                                    observation_code_code_system = observation_code.get('@codeSystem', '')
+                                    if observation_code_code_system == '1.2.643.5.1.13.13.11.1077':
+                                        row_diagnosis_kind_code = observation_code.get('@code', None)
+                                        row_diagnosis_kind_name = unescape(observation_code.get('@displayName', None))
+                                        break
+                        if row_diagnosis:
+                            diagnoses = diagnoses.union(
+                                {
+                                    (
+                                        row_diagnosis,
+                                        row_diagnosis_time,
+                                        row_diagnosis_kind_code,
+                                        row_diagnosis_name,
+                                        row_diagnosis_kind_name
+                                    )
+                                 }
+                            )
+                    except:
+                        pass
 
-    # Formate result diagnoses list
     result = list()
-    diagnoses = sorted(diagnoses, key=lambda x: x[0]+'None' if x[1] is None else x[0]+x[1].strftime("%Y%m%d"))
+    diagnoses = sorted(
+        diagnoses,
+        key=lambda x: x[0]+'None'+'999' if x[1] is None and x[2] is None
+        else x[0]+x[1].strftime("%Y%m%d")+'999' if x[1] is not None and x[2] is None
+        else x[0]+'None'+x[2].zfill(3) if x[1] is None and x[2] is not None
+        else x[0]+x[1].strftime("%Y%m%d")+x[2].zfill(3)
+    )
     previous_code = None
-    for code, dat in diagnoses:
+    for code, dat, kind, name, kind_name in diagnoses:
         if previous_code is None or previous_code != code:
             previous_code = code
-            query_body = f"""
-                SELECT
-                    name
-                FROM
-                    directory
-                WHERE
-                    passport_oid = '1.2.643.5.1.13.13.11.1005' AND
-                    code = '{code}'
-                ORDER BY
-                    version DESC
-                """
-            with connections['rosminzdrav-directories'].cursor() as cursor:
-                cursor.execute(query_body)
-                names = cursor.fetchall()
             result.append(OrderedDict([
                 ('diagnosis_code', code),
-                ('diagnosis_name', names[0][0]),
-                ('diagnosis_date', dat)
+                ('diagnosis_name', name),
+                ('diagnosis_first_date', dat),
+                ('diagnosis_first_kind_code', kind),
+                ('diagnosis_first_kind_name', kind_name),
             ]))
-    result = sorted(result, key=lambda x: date.today() if x['diagnosis_date'] is None else x['diagnosis_date'])
+
+    result = \
+        sorted(result, key=lambda x: date.today() if x['diagnosis_first_date'] is None else x['diagnosis_first_date'])
 
     return result
 
@@ -419,3 +486,282 @@ def get_patient_tags(tags: list) -> List[OrderedDict]:
     ]
 
     return result
+
+
+class GetPatientDiagnosesService:
+    @staticmethod
+    def execute(request: Request, view: ModelViewSet, *args, **kwargs) -> PatientListDiagnosisSerializer:
+        """
+            Retrieve SEMD diagnoses of patient
+        """
+
+        # Check input data
+        rid = kwargs.get("pk", None)
+        if not rid:
+            raise ParseError(f"Request must have 'rid' parameter", code='rid')
+
+        # Define queries
+        query_body = f"""
+            SELECT 
+                internalMessageId 
+            FROM 
+                (
+                    SELECT 
+                        EXPAND(records) 
+                    FROM 
+                        ptn 
+                    WHERE 
+                        @rid={rid}
+                ) 
+            WHERE 
+                @class="RcSMS"
+        """
+
+        # Get messages
+        orient_result = orient_db_client.query(query_body, -1)
+        messages = ["'" + rec.oRecordData.get('internalMessageId', '') + "'" for rec in orient_result]
+
+        # Get message diagnoses
+        message_diagnoses = None
+        if messages:
+            query_body = """
+                SELECT
+                    regexp_replace(array_to_string(xpath('/x:ClinicalDocument/x:component/x:structuredBody/x:component//x:*[x:*[x:observation[x:value[@codeSystem="1.2.643.5.1.13.13.11.1005"]]]]', payload::xml, '{{x,urn:hl7-org:v3}}'), '<new/>'), '\n', ' ', 'g') as diagnoses,
+                    internal_message_id,
+                    document_type,
+                    array_to_string(xpath('/x:ClinicalDocument/x:effectiveTime/@value', payload::xml, '{{x,urn:hl7-org:v3}}'), ',') as date_time
+                FROM
+                    vimis_sending
+                WHERE
+                    internal_message_id in (""" + ','.join(messages) + ')'
+            with connections['egisz-db'].cursor() as cursor:
+                cursor.execute(query_body)
+                message_diagnoses = cursor.fetchall()
+
+        # Calculate diagnoses set
+        diagnoses = set()
+        if message_diagnoses:
+            for message_diagnosis in message_diagnoses:
+                xmls = message_diagnosis[0].split('<new/>')
+                internal_message_id = message_diagnosis[1]
+                document_type = message_diagnosis[2]
+                internal_message_time = datetime(
+                    int(message_diagnosis[3][0:4]),
+                    int(message_diagnosis[3][4:6]),
+                    int(message_diagnosis[3][6:8])
+                ).date()
+                for xml in xmls:
+                    if not xml:
+                        continue
+                    try:
+                        parent = xmltodict.parse(xml)
+                        if not isinstance(parent, dict):
+                            continue
+                        for parent_key, parent_dict in parent.items():
+                            if not isinstance(parent_dict, dict):
+                                continue
+                            parent_node_name = parent_key
+                            parent_node_class_code = parent_dict.get('@classCode', None)
+                            parent_node_code = None
+                            parent_node_display_name = None
+                            parent_node_code_system = None
+                            parent_node_code_system_version = None
+                            parent_node_code_system_name = None
+                            parent_node_code_node = parent_dict.get('code', None)
+                            if parent_node_code_node and isinstance(parent_node_code_node, dict):
+                                parent_node_code = parent_node_code_node.get('@code', None)
+                                parent_node_display_name = unescape(parent_node_code_node.get('@displayName', None))
+                                parent_node_code_system = parent_node_code_node.get('@codeSystem', None)
+                                parent_node_code_system_version = parent_node_code_node.get('@codeSystemVersion', None)
+                                parent_node_code_system_name = unescape(parent_node_code_node.get('@codeSystemName', None))
+                            for key, entry_list in parent_dict.items():
+                                if not isinstance(entry_list, list):
+                                    entry_list = [entry_list]
+                                for entry in entry_list:
+                                    if not isinstance(entry, dict):
+                                        continue
+                                    observation = entry.get('observation', None)
+                                    if not observation:
+                                        continue
+
+                                    row_date = None
+                                    observation_effective_times = observation.get('effectiveTime', None)
+                                    if isinstance(observation_effective_times, dict):
+                                        observation_effective_time = observation_effective_times.get('@value', None)
+                                        if isinstance(observation_effective_time, str):
+                                            row_date = datetime(
+                                                int(observation_effective_time[0:4]),
+                                                int(observation_effective_time[4:6]),
+                                                int(observation_effective_time[6:8])
+                                            ).date()
+
+                                    node_code = None
+                                    node_display_name = None
+                                    node_code_system = None
+                                    node_code_system_version = None
+                                    node_code_system_name = None
+                                    node_code_node = observation.get('code', None)
+                                    if node_code_node and isinstance(node_code_node, dict):
+                                        node_code = node_code_node.get('@code', None)
+                                        node_display_name = unescape(node_code_node.get('@displayName', None))
+                                        node_code_system = node_code_node.get('@codeSystem', None)
+                                        node_code_system_version = node_code_node.get('@codeSystemVersion', None)
+                                        node_code_system_name = unescape(node_code_node.get('@codeSystemName', None))
+
+                                    row_diagnosis = None
+                                    row_diagnosis_name = None
+                                    observation_values = observation.get('value', None)
+                                    if observation_values:
+                                        if not isinstance(observation_values, list):
+                                            observation_values = [observation_values]
+                                        for observation_value in observation_values:
+                                            if not isinstance(observation_value, dict):
+                                                continue
+                                            observation_value_code_system = observation_value.get('@codeSystem', '')
+                                            if observation_value_code_system == '1.2.643.5.1.13.13.11.1005':
+                                                row_diagnosis = observation_value.get('@code', None)
+                                                row_diagnosis_name = unescape(observation_value.get('@displayName', None))
+                                                break
+
+                                    if row_diagnosis:
+                                        diagnoses = diagnoses.union(
+                                            {
+                                                (
+                                                    row_diagnosis,
+                                                    row_date,
+                                                    node_code,
+                                                    row_diagnosis_name,
+                                                    internal_message_id,
+                                                    document_type,
+                                                    internal_message_time,
+                                                    parent_node_name,
+                                                    parent_node_class_code,
+                                                    parent_node_code,
+                                                    parent_node_display_name,
+                                                    parent_node_code_system,
+                                                    parent_node_code_system_version,
+                                                    parent_node_code_system_name,
+                                                    node_display_name,
+                                                    node_code_system,
+                                                    node_code_system_version,
+                                                    node_code_system_name
+                                                )
+                                            }
+                                        )
+                    except:
+                        pass
+
+        diagnoses = sorted(
+            diagnoses,
+            key=lambda x: x[0]+'None'+'999' if x[1] is None and x[2] is None
+            else x[0]+x[1].strftime("%Y%m%d")+'999' if x[1] is not None and x[2] is None
+            else x[0]+'None'+x[2].zfill(3) if x[1] is None and x[2] is not None
+            else x[0]+x[1].strftime("%Y%m%d")+x[2].zfill(3)
+        )
+        result_diagnoses = list()
+        result_diagnoses_in_semds = list()
+        diagnosis_code = None
+        diagnosis_name = None
+        diagnosis_first_date = None
+        diagnosis_first_kind_code = None
+        diagnosis_first_kind_name = None
+        previous_code = None
+        for row_diagnosis, row_date, node_code, row_diagnosis_name, internal_message_id, document_type, \
+                internal_message_time, parent_node_name, parent_node_class_code, parent_node_code, \
+                parent_node_display_name, parent_node_code_system, parent_node_code_system_version, \
+                parent_node_code_system_name, node_display_name, node_code_system, \
+                node_code_system_version, node_code_system_name in diagnoses:
+            if previous_code is None or previous_code != row_diagnosis:
+                if previous_code is not None:
+                    result_diagnoses.append(OrderedDict([
+                        ('diagnosis_code', diagnosis_code),
+                        ('diagnosis_name', diagnosis_name),
+                        ('diagnosis_first_date', diagnosis_first_date),
+                        ('diagnosis_first_kind_code', diagnosis_first_kind_code),
+                        ('diagnosis_first_kind_name', diagnosis_first_kind_name),
+                        ('diagnoses_in_semds', result_diagnoses_in_semds),
+                    ]))
+                previous_code = row_diagnosis
+                diagnosis_code = row_diagnosis
+                diagnosis_name = row_diagnosis_name
+                diagnosis_first_date = row_date
+                diagnosis_first_kind_code = node_code
+                diagnosis_first_kind_name = node_display_name
+                result_diagnoses_in_semds = list()
+
+            result_diagnoses_in_semds.append(OrderedDict([
+                ('date', row_date),
+                ('document_type', document_type),
+                ('internal_message_id', internal_message_id),
+                ('internal_message_time', internal_message_time),
+                ('parent_node_name', parent_node_name),
+                ('parent_node_class_code', parent_node_class_code),
+                ('parent_node_code_node', OrderedDict([
+                    ('code', parent_node_code),
+                    ('display_name', parent_node_display_name),
+                    ('code_system', parent_node_code_system),
+                    ('code_system_version', parent_node_code_system_version),
+                    ('code_system_name', parent_node_code_system_name),
+                ])),
+                ('code_node', OrderedDict([
+                    ('code', node_code),
+                    ('display_name', node_display_name),
+                    ('code_system', node_code_system),
+                    ('code_system_version', node_code_system_version),
+                    ('code_system_name', node_code_system_name),
+                ])),
+            ]))
+
+        if previous_code is not None:
+            result_diagnoses.append(OrderedDict([
+                ('diagnosis_code', diagnosis_code),
+                ('diagnosis_name', diagnosis_name),
+                ('diagnosis_first_date', diagnosis_first_date),
+                ('diagnosis_first_kind_code', diagnosis_first_kind_code),
+                ('diagnosis_first_kind_name', diagnosis_first_kind_name),
+                ('diagnoses_in_semds', result_diagnoses_in_semds),
+            ]))
+
+        result_diagnoses = \
+            sorted(
+                result_diagnoses,
+                key=lambda x: date.today() if x['diagnosis_first_date'] is None else x['diagnosis_first_date']
+            )
+
+        patient_diagnosis_list_serializer = PatientDiagnosisSerializer(result_diagnoses, many=True)
+
+        count = len(result_diagnoses)
+        items_per_page = count
+        start_item_index = 0 if count == 0 else 1
+        end_item_index = count
+        previous_page = None
+        current_page = 1
+        next_page = None
+
+        # Formate pagination list's extra information schema
+        pagination_list_serializer = PaginationListSerializer(
+            data={
+                'count_items': count,
+                'items_per_page': items_per_page,
+                'start_item_index': start_item_index,
+                'end_item_index': end_item_index,
+                'previous_page': previous_page,
+                'current_page': current_page,
+                'next_page': next_page,
+            }
+        )
+        pagination_list_serializer.is_valid()
+
+        # Formate response schema
+        return_serializer = PatientListDiagnosisSerializer(
+            data={
+                'retCode': 0,
+                'retMsg': 'Ok' if count > 0 else 'Result set is empty',
+                'result': patient_diagnosis_list_serializer.data,
+                'retExtInfo': pagination_list_serializer.data,
+                'retTime': int(time.time() * 10 ** 3)
+            }
+        )
+        return_serializer.is_valid()
+
+        return return_serializer
