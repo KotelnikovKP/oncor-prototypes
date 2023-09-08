@@ -12,7 +12,7 @@ from api.serializers.patient_serializers import PatientListSerializer, PatientSe
 from api.serializers.registry_serializers import DiagnosisRegistryListSerializer, DiagnosisRegistrySerializer, \
     DiagnosisRegistrySingleEntrySerializer
 from api.serializers.serializers import PaginationListSerializer
-from api.services.patient_services import get_patient_semd_diagnoses
+from api.services.patient_services import get_patient_semd_diagnoses, get_patient_base_diagnoses, get_patient_tags
 from backend.settings import PAGE_SIZE
 
 
@@ -245,7 +245,16 @@ class GetDiagnosisRegistryPatientsService:
                 person.middleName as middlename, 
                 person.birthDay.format('yyyy-MM-dd') as birthday,
                 person.gender.value as gender, 
-                person.snils as snils 
+                person.snils as snils,
+                tags.tags.tag as tags,
+                observer.nsiMedOrg.oid as mo_oid,
+                observer.nsiMedOrg.name as mo_name,
+                person.address.medTerr.name as med_terr,
+                person.address.livingAreaType.rbps.S_NAME.value as living_area_type,
+                person.phones as phones,
+                person.address.locality.type as locality_type,
+                person.address.locality.name as locality_name,
+                person.address.address as address 
             FROM 
                 ptn
             WHERE
@@ -353,32 +362,21 @@ class GetDiagnosisRegistryPatientsService:
                     ('birthday', rec.oRecordData.get('birthday', None)),
                     ('gender', rec.oRecordData.get('gender', None)),
                     ('snils', rec.oRecordData.get('snils', None)),
-                    ('base_diagnoses', [
-                        OrderedDict(
-                            [
-                                ('diagnosis_code', d_rec.oRecordData.get('mkb10', None)),
-                                ('diagnosis_name', d_rec.oRecordData.get('name', None)),
-                            ]
-                        )
-                        for d_rec in orient_db_client.query(
-                            f'''
-                            SELECT 
-                                diagnosis.registerDz.mkb10 as mkb10, 
-                                diagnosis.registerDz.name as name 
-                            from 
-                                (SELECT 
-                                    EXPAND(records) 
-                                FROM 
-                                    ptn 
-                                WHERE 
-                                    @rid={str(rec.oRecordData.get('rid', None))}) 
-                            WHERE 
-                                @class="RcDz"
-                            ''',
-                            -1
-                        )
-                    ]),
+                    ('mo_oid', rec.oRecordData.get('mo_oid', None)),
+                    ('mo_name', rec.oRecordData.get('mo_name', None)),
+                    ('med_terr', rec.oRecordData.get('med_terr', None)),
+                    ('living_area_type', rec.oRecordData.get('living_area_type', None)),
+                    ('phones', rec.oRecordData.get('phones', None)),
+                    ('address', OrderedDict(
+                        [
+                            ('locality_type', rec.oRecordData.get('locality_type', None)),
+                            ('locality_name', rec.oRecordData.get('locality_name', None)),
+                            ('address', rec.oRecordData.get('address', None)),
+                        ]
+                    )),
+                    ('base_diagnoses', get_patient_base_diagnoses(str(rec.oRecordData.get('rid', None)))),
                     ('semd_diagnoses', get_patient_semd_diagnoses(str(rec.oRecordData.get('rid', None)))),
+                    ('tags', get_patient_tags(rec.oRecordData.get('tags', None))),
                 ]
             )
             for rec in orient_result

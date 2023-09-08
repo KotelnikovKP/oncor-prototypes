@@ -9,9 +9,10 @@ from rest_framework.viewsets import ModelViewSet
 from api.helpers import expand_dict
 from api.models.orientdb_engine import Patient
 from api.permissions.patient_permission import PatientPermission
-from api.serializers.patient_serializers import PatientSerializer, PatientListSerializer, PatientDetailsSerializer
+from api.serializers.patient_serializers import PatientSerializer, PatientListSerializer, PatientDetailsSerializer, \
+    PatientListDiagnosisSerializer
 from api.serializers.serializers import simple_responses
-from api.services.patient_services import GetPatientListService, GetPatientDetailsService
+from api.services.patient_services import GetPatientListService, GetPatientDetailsService, GetPatientDiagnosesService
 
 
 @extend_schema(tags=['Patient'])
@@ -56,19 +57,19 @@ class PatientViewSet(ModelViewSet):
         patient_details = GetPatientDetailsService.execute(request, self, *args, **kwargs)
         return Response(patient_details.data)
 
-    # @extend_schema(
-    #     summary='Retrieve diagnoses of patient',
-    #     description='Retrieve diagnoses of patient, bla-bla-bla...',
-    #     responses=expand_dict({status.HTTP_200_OK: PatientDiagnosisListSerializer, }, simple_responses),
-    # )
-    # @action(detail=True)
-    # def diagnoses(self, request, *args, **kwargs):
-    #     """
-    #         Retrieve diagnoses of patient
-    #     """
-    #     patient_diagnoses = GetPatientDiagnosesService.execute(request, self, *args, **kwargs)
-    #     return Response(patient_diagnoses.data)
-    #
+    @extend_schema(
+        summary='Retrieve SEMD diagnoses of patient',
+        description='Retrieve SEMD diagnoses of patient, bla-bla-bla...',
+        responses=expand_dict({status.HTTP_200_OK: PatientListDiagnosisSerializer, }, simple_responses),
+    )
+    @action(detail=True)
+    def diagnoses(self, request, *args, **kwargs):
+        """
+            Retrieve SEMD diagnoses of patient
+        """
+        patient_diagnoses = GetPatientDiagnosesService.execute(request, self, *args, **kwargs)
+        return Response(patient_diagnoses.data)
+
     # @extend_schema(
     #     summary='Retrieve medical cards of patient',
     #     description='Retrieve medical cards of patient, bla-bla-bla...',
