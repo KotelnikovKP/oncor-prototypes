@@ -1,6 +1,7 @@
 from django.db import models
 from pyorient import OrientDB
 
+from api.models.semd_models import SemdDiagnosis
 from backend.settings import ORIENTDB_HOST, ORIENTDB_PORT, ORIENTDB_NAME, ORIENTDB_USER, ORIENTDB_PASSWORD
 
 orient_db_client = OrientDB(ORIENTDB_HOST, ORIENTDB_PORT)
@@ -23,4 +24,5 @@ select diagnosis.registerDz.mkb10 as mkb10, diagnosis.registerDz.name as name fr
 select diagnosis.registerDz as rid, diagnosis.registerDz.mkb10 as mkb10, diagnosis.registerDz.name as name from (select EXPAND(records) from ptn where @rid=#65:1) where @class="RcDz"
 select * from Ptn where tags.tags CONTAINS(tag in [#3058:1]) 
 select @class, @rid, internalMessageId, title, smsSummaryJson, cdaXml.digest as cdaXml from (select EXPAND(records) from ptn where @rid=#70:16091) where @class="RcSMS"
-select @rid, ehr.patient.@rid as ptn_rid, timeRc, internalMessageId, title, smsDocumentType, cdaXml.digest as cdaXml, smsSummaryJson from (select EXPAND(records) from ptn where @rid=#67:19790) where @class="RcSMS" order by timeRc"""
+select @rid, ehr.patient.@rid as ptn_rid, timeRc, internalMessageId, title, smsDocumentType, cdaXml.digest as cdaXml, smsSummaryJson from (select EXPAND(records) from ptn where @rid=#67:19790) where @class="RcSMS" order by timeRc
+"""

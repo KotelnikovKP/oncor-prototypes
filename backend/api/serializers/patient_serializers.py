@@ -69,6 +69,7 @@ class PatientSerializer(serializers.Serializer):
     middlename = serializers.CharField(help_text='Patient middle name')
     birthday = serializers.DateField(help_text='Patient birthday')
     gender = serializers.CharField(help_text='Patient gender')
+    code = serializers.CharField(help_text='Patient extra abbreviation')
     snils = serializers.CharField(help_text='Patient SNILS')
     mo_oid = serializers.CharField(help_text='Patient assigned clinic oid')
     mo_name = serializers.CharField(help_text='Patient assigned clinic name')
