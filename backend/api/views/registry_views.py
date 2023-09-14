@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from api.filters.registry_filters import DiagnosisRegistryFilter
-from api.helpers import expand_dict
+from api.utils.base_utils import expand_dict
 from api.models.registry_models import DiagnosisRegistry
 from api.permissions.registry_permission import DiagnosisRegistryPermission
 from api.serializers.patient_serializers import PatientListSerializer

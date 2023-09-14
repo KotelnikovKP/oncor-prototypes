@@ -6,7 +6,7 @@ from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
-from api.helpers import expand_dict
+from api.utils.base_utils import expand_dict
 from api.models.orientdb_engine import Patient
 from api.permissions.patient_permission import PatientPermission
 from api.serializers.patient_serializers import PatientSerializer, PatientListSerializer, PatientDetailsSerializer, \

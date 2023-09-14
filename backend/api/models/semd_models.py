@@ -34,6 +34,7 @@ class SemdDiagnosis(models.Model):
         ordering = ['id']
         indexes = (
             Index(fields=['ptn_id', 'diagnosis_mkb10', 'diagnosis_date'], name='api_semddiagnosis_ptn_dz_dat'),
+            Index(fields=['ptn_id', 'diagnosis_mkb10', 'time_rc'], name='api_semddiagnosis_ptn_dz_rcdat'),
         )
 
 
@@ -68,6 +69,7 @@ class SemdService(models.Model):
         ordering = ['id']
         indexes = (
             Index(fields=['ptn_id', 'service_code', 'service_date'], name='api_semdservice_ptn_srv_dat'),
+            Index(fields=['ptn_id', 'service_code', 'time_rc'], name='api_semdservice_ptn_srv_rcdat'),
         )
 
 
@@ -83,6 +85,28 @@ class OncorSettings(models.Model):
         verbose_name = 'Oncor settings'
         verbose_name_plural = 'Oncor settings'
         ordering = ['code']
+
+
+class PatientDiagnosisMilestones(models.Model):
+    # Patient-Diagnosis cube
+    ptn_id = models.CharField(max_length=16, verbose_name='Patient @rid', db_index=True)
+    ptn_code = models.CharField(max_length=16, null=True, verbose_name='Patient extra abbreviation')
+    ptn_mo_oid = models.CharField(max_length=64, null=True, verbose_name='Patient MO OID')
+    ptn_tags = models.JSONField(null=True, verbose_name='Patient tags')
+    diagnosis_mkb10 = models.CharField(max_length=10, verbose_name='Diagnosis mkb10 code', db_index=True)
+    diagnosis_date = models.DateField(null=True, verbose_name='Diagnosis set date')
+    diagnosis_milestones = models.JSONField(null=True, verbose_name='Diagnosis milestones')
+
+    def __str__(self):
+        return str(self.ptn_id) + '-' + str(self.diagnosis_mkb10) + '-' + str(self.diagnosis_date)
+
+    class Meta:
+        verbose_name = 'Patient-Diagnosis'
+        verbose_name_plural = 'Patient-Diagnosis cube'
+        ordering = ['id']
+        indexes = (
+            Index(fields=['ptn_id', 'diagnosis_mkb10', 'diagnosis_date'], name='api_p_d_milestones_ptn_dz_dat'),
+        )
 
 
 # class SEMD(models.Model):

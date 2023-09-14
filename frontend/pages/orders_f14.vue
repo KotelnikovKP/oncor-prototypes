@@ -8,14 +8,12 @@
                 <div class="row mt-3">
                     <div class="col-md-2">
                         <div class="md-form mb-0">
-                            <input type="date" id="date_from" class="form-control" placeholder="С" v-model.lazy="date_from"
-                                @input="$v.date_from.$touch()">
+                            <input type="date" id="date_from" class="form-control" placeholder="С" v-model.lazy="date_from">
                         </div>
                     </div>
                     <div class="col-md-2">
                         <div class="md-form">
-                            <input type="date" id="date_to" class="form-control" placeholder="По" v-model.lazy="date_to"
-                                @input="$v.date_to.$touch()">
+                            <input type="date" id="date_to" class="form-control" placeholder="По" v-model.lazy="date_to">
                         </div>
                     </div>
                     <div class="col-md-2">
