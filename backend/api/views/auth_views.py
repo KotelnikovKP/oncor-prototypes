@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
-from api.helpers import expand_dict
+from api.utils.base_utils import expand_dict
 from api.serializers.auth_serializers import UserRegisterSerializer, UserCreateSerializer, UserDetailsSerializer
 from api.serializers.serializers import simple_responses
 from api.services.auth_services import CreateUserService, GetUserDetailsService

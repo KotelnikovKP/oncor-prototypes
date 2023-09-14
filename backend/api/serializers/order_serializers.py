@@ -29,6 +29,7 @@ class OrderRuleSerializer(serializers.Serializer):
     order_author = serializers.CharField(required=False, help_text='Order author')
     rule_name = serializers.CharField(required=False, help_text='Order rule name')
     rule_text = serializers.CharField(required=False, help_text='Order rule text')
+    rule_diagnoses = serializers.CharField(required=False, help_text='Order rule diagnoses template')
 
 
 class F14Serializer(serializers.Serializer):
