@@ -94,7 +94,7 @@ class PatientDiagnosisMilestones(models.Model):
     ptn_mo_oid = models.CharField(max_length=64, null=True, verbose_name='Patient MO OID')
     ptn_tags = models.JSONField(null=True, verbose_name='Patient tags')
     diagnosis_mkb10 = models.CharField(max_length=10, verbose_name='Diagnosis mkb10 code', db_index=True)
-    diagnosis_date = models.DateField(null=True, verbose_name='Diagnosis set date')
+    diagnosis_date = models.DateField(null=True, verbose_name='Diagnosis set date', db_index=True)
     diagnosis_milestones = models.JSONField(null=True, verbose_name='Diagnosis milestones')
 
     def __str__(self):
@@ -105,6 +105,7 @@ class PatientDiagnosisMilestones(models.Model):
         verbose_name_plural = 'Patient-Diagnosis cube'
         ordering = ['id']
         indexes = (
+            Index(fields=['ptn_id', 'diagnosis_date'], name='api_p_d_milestones_ptn_dat'),
             Index(fields=['ptn_id', 'diagnosis_mkb10', 'diagnosis_date'], name='api_p_d_milestones_ptn_dz_dat'),
         )
 

@@ -1,3 +1,5 @@
+from collections import OrderedDict
+
 from django.db import connections
 
 
@@ -125,3 +127,33 @@ def expand_services_only_codes(services: list) -> set:
             result_set = result_set.union({directory_service[0]})
 
     return result_set
+
+
+def expand_mos(mo_oids: set) -> list:
+    query_body = """
+        SELECT
+            oid,
+            name
+        FROM 
+            directory
+        WHERE
+            passport_oid='1.2.643.5.1.13.13.11.1461' AND
+            oid in (""" + ','.join(["'" + mo_oid + "'" for mo_oid in mo_oids]) + """)
+        ORDER BY
+            name
+    """
+    with connections['rosminzdrav-directories'].cursor() as cursor:
+        cursor.execute(query_body)
+        directory_mos = cursor.fetchall()
+
+    result = [
+        OrderedDict([
+            ('mo_oid', directory_mo[0]),
+            ('mo_name', directory_mo[1]),
+        ])
+        for directory_mo in directory_mos
+    ]
+
+    return result
+
+
