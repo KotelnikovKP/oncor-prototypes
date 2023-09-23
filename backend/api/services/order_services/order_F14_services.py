@@ -137,17 +137,17 @@ def get_grouped_rule_services() -> list:
             if not isinstance(order, dict):
                 continue
 
-            order_name = order.get('order_name', None)
-            order_author = order.get('order_author', None)
-            order_valid = order.get('order_valid', None)
+            order_name = order.get('наименование', None)
+            order_author = order.get('автор', None)
+            order_valid = order.get('действителен', None)
             if order_valid and isinstance(order_valid, dict):
-                order_valid_from = order_valid.get('from', None)
-                order_valid_to = order_valid.get('to', None)
+                order_valid_from = order_valid.get('от', None)
+                order_valid_to = order_valid.get('до', None)
             else:
                 order_valid_from = None
                 order_valid_to = None
 
-            rules = order.get('rules', None)
+            rules = order.get('правила', None)
             if not rules or not isinstance(rules, list):
                 break
 
@@ -155,16 +155,16 @@ def get_grouped_rule_services() -> list:
                 if not isinstance(rule, dict):
                     continue
 
-                rule_name = rule.get('name', None)
-                rule_text = rule.get('text', None)
+                rule_name = rule.get('наименование', None)
+                rule_text = rule.get('текст', None)
 
-                rule_diagnoses = rule.get('diagnoses', None)
+                rule_diagnoses = rule.get('диагнозы', None)
                 if not rule_diagnoses or not isinstance(rule_diagnoses, str):
                     continue
 
                 rule_expanded_diagnoses = expand_diagnoses(rule_diagnoses)
 
-                rule_mandatory_services = rule.get('mandatory_services', None)
+                rule_mandatory_services = rule.get('обязательныеУслуги', None)
                 if not rule_mandatory_services or not isinstance(rule_mandatory_services, list):
                     continue
 
@@ -172,10 +172,10 @@ def get_grouped_rule_services() -> list:
                     if not rule_mandatory_service or not isinstance(rule_mandatory_service, dict):
                         continue
 
-                    rule_services_group = rule_mandatory_service.get('group', None)
-                    rule_services_period = rule_mandatory_service.get('period', None)
-                    rule_services_name = rule_mandatory_service.get('name', None)
-                    rule_services = rule_mandatory_service.get('services', None)
+                    rule_services_group = rule_mandatory_service.get('группа', None)
+                    rule_services_period = rule_mandatory_service.get('срокРабочихДней', None)
+                    rule_services_name = rule_mandatory_service.get('наименование', None)
+                    rule_services = rule_mandatory_service.get('услуги', None)
 
                     if not rule_services or not isinstance(rule_services, list):
                         continue
