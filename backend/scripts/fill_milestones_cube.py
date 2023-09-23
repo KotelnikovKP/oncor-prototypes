@@ -84,6 +84,9 @@ def run(*args):
                 if not rule_diagnoses_service['diagnoses'].count(patient_diagnosis.diagnosis_mkb10):
                     continue
 
+                if not rule_diagnoses_service['services']:
+                    continue
+
                 # Get referrals
                 query_body = """
                     SELECT
@@ -167,10 +170,10 @@ def get_rule_diagnoses_services(check_date: date = datetime.now().date()) -> lis
             if not order_code or not isinstance(order_code, str):
                 continue
 
-            order_valid = order.get('order_valid', None)
+            order_valid = order.get('действителен', None)
             if order_valid and isinstance(order_valid, dict):
-                order_valid_from = order_valid.get('from', None)
-                order_valid_to = order_valid.get('to', None)
+                order_valid_from = order_valid.get('от', None)
+                order_valid_to = order_valid.get('до', None)
             else:
                 order_valid_from = None
                 order_valid_to = None
@@ -208,7 +211,7 @@ def get_rule_diagnoses_services(check_date: date = datetime.now().date()) -> lis
             if order_valid_to and isinstance(order_valid_to, date) and order_valid_to < check_date:
                 continue
 
-            rules = order.get('rules', None)
+            rules = order.get('правила', None)
             if not rules or not isinstance(rules, list):
                 continue
 
@@ -220,13 +223,13 @@ def get_rule_diagnoses_services(check_date: date = datetime.now().date()) -> lis
                 if not rule_code or not isinstance(rule_code, str):
                     continue
 
-                rule_diagnoses = rule.get('diagnoses', None)
+                rule_diagnoses = rule.get('диагнозы', None)
                 if not rule_diagnoses or not isinstance(rule_diagnoses, str):
                     continue
 
                 rule_expanded_diagnoses = expand_diagnoses_only_codes(rule_diagnoses)
 
-                rule_mandatory_services = rule.get('mandatory_services', None)
+                rule_mandatory_services = rule.get('обязательныеУслуги', None)
                 if not rule_mandatory_services or not isinstance(rule_mandatory_services, list):
                     continue
 
@@ -238,7 +241,7 @@ def get_rule_diagnoses_services(check_date: date = datetime.now().date()) -> lis
                     if not rule_services_code or not isinstance(rule_services_code, str):
                         continue
 
-                    rule_services = rule_mandatory_service.get('services', None)
+                    rule_services = rule_mandatory_service.get('услуги', None)
                     if not rule_services or not isinstance(rule_services, list):
                         continue
 
