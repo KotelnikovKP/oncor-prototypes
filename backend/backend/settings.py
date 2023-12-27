@@ -102,6 +102,12 @@ EGISZ_DB_NAME: str = os.environ.get('EGISZ_DB_NAME', 'egisz-db')
 EGISZ_DB_USER: str = os.environ.get('EGISZ_DB_USER', 'semd')
 EGISZ_DB_PASSWORD: str = os.environ.get('EGISZ_DB_PASSWORD', '')
 
+EGISZ_DB_66_HOST: str = os.environ.get('EGISZ_DB_66_HOST', '127.0.0.1')
+EGISZ_DB_66_PORT: str = os.environ.get('EGISZ_DB_66_PORT', '5432')
+EGISZ_DB_66_NAME: str = os.environ.get('EGISZ_DB_66_NAME', 'egisz-db-66')
+EGISZ_DB_66_USER: str = os.environ.get('EGISZ_DB_66_USER', 'semd')
+EGISZ_DB_66_PASSWORD: str = os.environ.get('EGISZ_DB_66_PASSWORD', '')
+
 ONCOR_DATA_ANALYTICS_HOST: str = os.environ.get('ONCOR_DATA_ANALYTICS_HOST', '127.0.0.1')
 ONCOR_DATA_ANALYTICS_PORT: str = os.environ.get('ONCOR_DATA_ANALYTICS_PORT', '5432')
 ONCOR_DATA_ANALYTICS_NAME: str = os.environ.get('ONCOR_DATA_ANALYTICS_NAME', 'oncor-data-analytics')
@@ -139,6 +145,14 @@ DATABASES = {
         'PASSWORD': EGISZ_DB_PASSWORD,
         'HOST': EGISZ_DB_HOST,
         'PORT': EGISZ_DB_PORT,
+    },
+    'egisz-db-66': {
+        'ENGINE': 'django.db.backends.postgresql_psycopg2',
+        'NAME': EGISZ_DB_66_NAME,
+        'USER': EGISZ_DB_66_USER,
+        'PASSWORD': EGISZ_DB_66_PASSWORD,
+        'HOST': EGISZ_DB_66_HOST,
+        'PORT': EGISZ_DB_66_PORT,
     },
     'oncor-data-analytics': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
